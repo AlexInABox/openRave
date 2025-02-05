@@ -5,23 +5,63 @@ import 'package:just_audio/just_audio.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:audio_session/audio_session.dart';
 import 'backend_handler.dart';
+import 'service_locator.dart'; // Import the setupLocator function
 
 class RaveAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler, ChangeNotifier {
-  final AudioPlayer _audioPlayer = AudioPlayer(
-    handleInterruptions: true,
-    audioLoadConfiguration: AudioLoadConfiguration(
-      darwinLoadControl: DarwinLoadControl(
-        preferredForwardBufferDuration: Duration(seconds: 300),
-      ),
-    ),
-  );
-  final YoutubeExplode _yt = YoutubeExplode();
+  late AudioPlayer _audioPlayer;
+  late YoutubeExplode _yt;
   final RoomController _roomController = RoomController();
+  bool _isFirstRun = false;
 
   late Video video;
   Duration position = Duration.zero;
   MediaItem? currentMediaItem;
+
+  Future<void> init() async {
+    _yt = YoutubeExplode();
+    _audioPlayer = AudioPlayer(
+      handleInterruptions: true,
+      audioLoadConfiguration: AudioLoadConfiguration(
+        darwinLoadControl: DarwinLoadControl(
+          preferredForwardBufferDuration: Duration(seconds: 300),
+        ),
+      ),
+    );
+
+    if (_isFirstRun) {
+      final AudioSession session = getIt.get<AudioSession>();
+      session.interruptionEventStream.listen((event) {
+        if (event.begin) {
+          switch (event.type) {
+            case AudioInterruptionType.duck:
+              // Another app started playing audio and we should duck.
+              break;
+            case AudioInterruptionType.pause:
+              if (predictedPlayingState) _audioPlayer.play();
+              // Another app started playing audio and we should pause.
+              break;
+            case AudioInterruptionType.unknown:
+              // Another app started playing audio and we should pause.
+              if (predictedPlayingState) _audioPlayer.play();
+              break;
+          }
+        } else {
+          switch (event.type) {
+            case AudioInterruptionType.duck:
+              // The interruption ended and we should unduck.
+              break;
+            case AudioInterruptionType.pause:
+              // The interruption ended and we should resume.
+              break;
+            case AudioInterruptionType.unknown:
+              // The interruption ended but we should not resume.
+              break;
+          }
+        }
+      });
+    }
+  }
 
   Future<String> getLink(String id) async {
     var manifest = await _yt.videos.streamsClient.getManifest(id, ytClients: [
@@ -36,51 +76,6 @@ class RaveAudioHandler extends BaseAudioHandler
   }
 
   Future<void> catchUp(String videoId, Duration time, String state) async {
-    final session = await AudioSession.instance;
-    await session.configure(
-      AudioSessionConfiguration(
-        avAudioSessionCategory: AVAudioSessionCategory.playback,
-        avAudioSessionMode: AVAudioSessionMode.defaultMode,
-        androidAudioAttributes: const AndroidAudioAttributes(
-          contentType: AndroidAudioContentType.music,
-          usage: AndroidAudioUsage.media,
-        ),
-        androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
-      ),
-    );
-    await session.setActive(true);
-
-/*
-    session.interruptionEventStream.listen((event) {
-      if (event.begin) {
-        switch (event.type) {
-          case AudioInterruptionType.duck:
-            // Another app started playing audio and we should duck.
-            break;
-          case AudioInterruptionType.pause:
-            if (predictedPlayingState) _audioPlayer.play();
-            // Another app started playing audio and we should pause.
-            break;
-          case AudioInterruptionType.unknown:
-            // Another app started playing audio and we should pause.
-            if (predictedPlayingState) _audioPlayer.play();
-            break;
-        }
-      } else {
-        switch (event.type) {
-          case AudioInterruptionType.duck:
-            // The interruption ended and we should unduck.
-            break;
-          case AudioInterruptionType.pause:
-            // The interruption ended and we should resume.
-            break;
-          case AudioInterruptionType.unknown:
-            // The interruption ended but we should not resume.
-            break;
-        }
-      }
-    });
-*/
     _audioPlayer.positionStream.listen((event) {
       position = event;
       notifyListeners();

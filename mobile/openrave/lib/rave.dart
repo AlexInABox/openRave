@@ -30,6 +30,7 @@ class _RaveState extends State<Rave> {
   }
 
   Future<void> _initAudioService() async {
+    await _audioHandler.init();
     _audioHandler.addListener(() {
       if (mounted) {
         setState(() {});

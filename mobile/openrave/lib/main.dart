@@ -27,6 +27,7 @@ Future<void> main() async {
     ),
   );
   await session.setActive(true);
+  setupAudioSession(session); // Register the instance globally
 
   final RaveAudioHandler audioHandler = await AudioService.init(
     builder: () => RaveAudioHandler(),
