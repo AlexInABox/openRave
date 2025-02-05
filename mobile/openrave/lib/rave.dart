@@ -23,6 +23,7 @@ class _RaveState extends State<Rave> {
   bool audioHandlerInitialized = false;
   String localRoomCode = "";
   ConnectionState backendConnectionState = ConnectionState.waiting;
+  bool _copied = false;
 
   @override
   void initState() {
@@ -120,13 +121,27 @@ class _RaveState extends State<Rave> {
               IconButton(
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: localRoomCode));
+                  await animateCopyButtonOverOneSecond();
                   // copied successfully
                 },
-                icon: Icon(
-                  Icons.copy,
-                  color: Colors.blueAccent,
-                  size: 24.0,
-                  semanticLabel: 'Copy the room code.',
+                enableFeedback: true,
+                icon: AnimatedSwitcher(
+                  duration: Duration(milliseconds: 250),
+                  transitionBuilder: (child, animation) =>
+                      ScaleTransition(scale: animation, child: child),
+                  child: _copied
+                      ? Icon(
+                          Icons.check_sharp,
+                          key: ValueKey<bool>(true),
+                          color: Colors.green,
+                          size: 29.0,
+                        )
+                      : Icon(
+                          Icons.copy,
+                          key: ValueKey<bool>(false),
+                          color: Colors.blueAccent,
+                          size: 24.0,
+                        ),
                 ),
               ),
             ],
@@ -493,5 +508,21 @@ class _RaveState extends State<Rave> {
     _audioHandler.seek(Duration(
         milliseconds:
             (value * _audioHandler.video.duration!.inMilliseconds).toInt()));
+  }
+
+  animateCopyButtonOverOneSecond() async {
+    if (mounted) {
+      setState(() {
+        _copied = true;
+      });
+    }
+    // Reset back to copy icon after 1.5 seconds
+    Future.delayed(Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() {
+          _copied = false;
+        });
+      }
+    });
   }
 }
