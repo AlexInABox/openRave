@@ -133,7 +133,7 @@ class _RaveState extends State<Rave> {
                     width: MediaQuery.sizeOf(context).width * 0.3,
                     child: Material(
                       borderRadius: BorderRadius.circular(10),
-                      color: Colors.red,
+                      color: getBackendConnectionInfoAsColor(),
                       child: Center(
                         child: getBackendConnectionInfo(),
                       ),
@@ -304,7 +304,7 @@ class _RaveState extends State<Rave> {
       return Text(
         "Connecting...",
         style: TextStyle(
-          color: Colors.white,
+          color: Colors.black,
           fontSize: 13,
         ),
       );
@@ -320,6 +320,18 @@ class _RaveState extends State<Rave> {
       );
     }
     return null;
+  }
+
+  MaterialColor getBackendConnectionInfoAsColor() {
+    //0.0 means it will be hidden; null means it will be shown
+    if (backendConnectionState == ConnectionState.waiting) {
+      return Colors.yellow;
+    } else if (backendConnectionState == ConnectionState.active) {
+      return Colors.red;
+    } else if (backendConnectionState == ConnectionState.done) {
+      return Colors.red;
+    }
+    return Colors.red;
   }
 
   void seekBackToBeginning() {
