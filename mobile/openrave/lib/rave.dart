@@ -347,6 +347,7 @@ class _RaveState extends State<Rave> {
     if (backendConnectionState == ConnectionState.waiting) {
       return Text(
         "Connecting...",
+        textAlign: TextAlign.center,
         style: TextStyle(
           color: Colors.black,
           fontSize: 13,
@@ -358,6 +359,7 @@ class _RaveState extends State<Rave> {
       }
       return Text(
         "Loading...",
+        textAlign: TextAlign.center,
         style: TextStyle(
           color: Colors.white,
           fontSize: 13,
@@ -366,6 +368,7 @@ class _RaveState extends State<Rave> {
     } else if (backendConnectionState == ConnectionState.done) {
       return Text(
         "Connection lost.",
+        textAlign: TextAlign.center,
         style: TextStyle(
           color: Colors.white,
           fontSize: 13,
