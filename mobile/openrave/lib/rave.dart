@@ -90,6 +90,12 @@ class _RaveState extends State<Rave> {
         }
       }
     });
+    //I cant fix my own code so I will just leave this here
+    //Why? Sometimes the connection is successfully established
+    //before the above eventListener has fully attached;
+    //resulting in the "catchUp" message being missed!
+    await Future.delayed(Duration(milliseconds: 100));
+
     widget._roomController.connect(localRoomCode, eventReceiver);
   }
 

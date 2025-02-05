@@ -77,6 +77,7 @@ class RaveAudioHandler extends BaseAudioHandler
   }
 
   Future<void> catchUp(String videoId, Duration time, String state) async {
+    final startTime = DateTime.now();
     _audioPlayer.positionStream.listen((event) {
       position = event;
       notifyListeners();
@@ -87,10 +88,15 @@ class RaveAudioHandler extends BaseAudioHandler
     await refreshMetadata(videoId);
     var link = await getLink(videoId);
     await _audioPlayer.setUrl(link);
-    await _audioPlayer.seek(time); // Seek to the specific time first
+    // Calculate elapsed time
+    final elapsed = DateTime.now().difference(startTime);
+    final adjustedTime = time + elapsed; // Add elapsed time
+
     if (state == "playing") {
+      await _audioPlayer.seek(adjustedTime); // Seek to the specific time first
       _audioPlayer.play(); // Start playing after the seek
     } else {
+      await _audioPlayer.seek(time); // Seek to the specific time first
       _audioPlayer.pause();
     }
   }
