@@ -112,35 +112,53 @@ class _RaveState extends State<Rave> {
       navigationBar: CupertinoNavigationBar(
         middle: Center(
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              const SizedBox(
+                  width:
+                      68), //68 is equal to the sum of the width of all elements to the right of the text
               SelectableText('Room: $localRoomCode'),
               const SizedBox(width: 10),
+              SizedBox(
+                width: 29,
+                child: IconButton(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: localRoomCode));
+                    HapticFeedback.heavyImpact();
+
+                    await animateCopyButton();
+                    // copied successfully
+                  },
+                  enableFeedback: true,
+                  icon: AnimatedSwitcher(
+                    duration: Duration(milliseconds: 250),
+                    transitionBuilder: (child, animation) =>
+                        ScaleTransition(scale: animation, child: child),
+                    child: _copied
+                        ? Icon(
+                            Icons.check_sharp,
+                            key: ValueKey<bool>(true),
+                            color: Colors.green,
+                            size: 29.0,
+                          )
+                        : Icon(
+                            Icons.copy,
+                            key: ValueKey<bool>(false),
+                            color: Colors.blueAccent,
+                            size: 24.0,
+                          ),
+                  ),
+                ),
+              ),
               IconButton(
                 onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: localRoomCode));
-                  await animateCopyButton();
-                  // copied successfully
+                  //Open the search page
                 },
-                enableFeedback: true,
-                icon: AnimatedSwitcher(
-                  duration: Duration(milliseconds: 250),
-                  transitionBuilder: (child, animation) =>
-                      ScaleTransition(scale: animation, child: child),
-                  child: _copied
-                      ? Icon(
-                          Icons.check_sharp,
-                          key: ValueKey<bool>(true),
-                          color: Colors.green,
-                          size: 29.0,
-                        )
-                      : Icon(
-                          Icons.copy,
-                          key: ValueKey<bool>(false),
-                          color: Colors.blueAccent,
-                          size: 24.0,
-                        ),
+                icon: Icon(
+                  Icons.search,
+                  color: Colors.blueAccent,
+                  size: 29.0,
                 ),
               ),
             ],
