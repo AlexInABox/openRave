@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -43,7 +45,9 @@ class _RaveState extends State<Rave> {
   }
 
   Future<void> _initWebsocket() async {
-    widget._roomController.onEvent.listen((event) async {
+    final StreamController<String> eventReceiver = StreamController<String>();
+    eventReceiver.stream.listen((event) async {
+      print("Got the event: $event");
       if (event.startsWith("catchUp: ")) {
         //"catchUp: uMkBuxEDkyg 104.7096185064935 playing"
         List<String> parts = event.split(' ');
@@ -53,10 +57,10 @@ class _RaveState extends State<Rave> {
             double.parse(parts[2]); // Assuming seekTime is at index 2
         String state =
             parts[3]; // Assuming the state (e.g., "playing") is at index 3
-        _audioHandler.catchUp(
+        _audioHandler.refreshMetadata(videoId);
+        await _audioHandler.catchUp(
             videoId, Duration(milliseconds: (seekTime * 1000).round()), state);
 
-        await _audioHandler.refreshMetadata(videoId);
         audioHandlerInitialized = true;
       } else if (event.startsWith("videoId: ")) {
         String videoId = event.substring(9);
@@ -86,13 +90,13 @@ class _RaveState extends State<Rave> {
         }
       }
     });
-
-    widget._roomController.initialize(localRoomCode);
+    widget._roomController.connect(localRoomCode, eventReceiver);
   }
 
   @override
   void dispose() {
     _audioHandler.stop();
+    widget._roomController.dispose();
     super.dispose();
   }
 
@@ -311,7 +315,16 @@ class _RaveState extends State<Rave> {
         ),
       );
     } else if (backendConnectionState == ConnectionState.active) {
-      return null;
+      if (audioHandlerInitialized) {
+        return null;
+      }
+      return Text(
+        "Loading...",
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 13,
+        ),
+      );
     } else if (backendConnectionState == ConnectionState.done) {
       return Text(
         "Connection lost.",
@@ -329,7 +342,10 @@ class _RaveState extends State<Rave> {
     if (backendConnectionState == ConnectionState.waiting) {
       return Colors.yellow;
     } else if (backendConnectionState == ConnectionState.active) {
-      return Colors.red;
+      if (audioHandlerInitialized) {
+        return Colors.red;
+      }
+      return Colors.blue;
     } else if (backendConnectionState == ConnectionState.done) {
       return Colors.red;
     }

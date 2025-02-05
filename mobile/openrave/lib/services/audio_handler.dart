@@ -12,7 +12,7 @@ class RaveAudioHandler extends BaseAudioHandler
   late AudioPlayer _audioPlayer;
   late YoutubeExplode _yt;
   final RoomController _roomController = RoomController();
-  bool _isFirstRun = false;
+  bool _isFirstRun = true;
 
   late Video video;
   Duration position = Duration.zero;
@@ -60,6 +60,7 @@ class RaveAudioHandler extends BaseAudioHandler
           }
         }
       });
+      _isFirstRun = false;
     }
   }
 

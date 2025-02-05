@@ -5,8 +5,8 @@ class RoomController {
   static final RoomController _instance = RoomController._internal();
   late WebSocketChannel _channel;
   late String _roomCode;
-  final StreamController<String> _eventController =
-      StreamController.broadcast();
+  StreamController<String> _eventController =
+      StreamController<String>.broadcast();
   Timer? _keepAliveTimer;
 
   factory RoomController() {
@@ -16,25 +16,31 @@ class RoomController {
   RoomController._internal();
 
   // Initialize the WebSocket connection with the room code
-  void initialize(String roomCode) {
+  void connect(
+      String roomCode, StreamController<String> passedEventReceiver) async {
     _roomCode = roomCode;
+    _eventController = passedEventReceiver;
+
     final uri =
         Uri.parse('wss://openRave.zeitvertreib.vip/backend/?room=$_roomCode');
     _channel = WebSocketChannel.connect(uri);
 
-    if (!_eventController.isClosed) {
-      // Listen for incoming messages
-      _channel.stream.listen((message) {
+    // Listen for incoming messages immediately
+    _channel.stream.listen(
+      (message) {
         _eventController.add("alive");
         _handleMessage(message);
-      }, onError: (error) {
+      },
+      onError: (error) {
         print('WebSocket error: $error');
         _eventController.add("error");
-      }, onDone: () {
+      },
+      onDone: () {
         print('WebSocket connection closed');
         _eventController.add("closed");
-      });
-    }
+      },
+      cancelOnError: true, // Ensures errors don't leave a hanging connection
+    );
 
     // Start keepalive to maintain connection
     _startKeepAlive();
@@ -54,9 +60,6 @@ class RoomController {
   void seek(double timestampInSeconds) {
     _sendMessage('seek: $timestampInSeconds');
   }
-
-  // Listen for specific events from the server
-  Stream<String> get onEvent => _eventController.stream;
 
   // Close the WebSocket connection and event controller
   void dispose() {
