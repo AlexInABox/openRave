@@ -121,7 +121,7 @@ class _RaveState extends State<Rave> {
               IconButton(
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: localRoomCode));
-                  await animateCopyButtonOverOneSecond();
+                  await animateCopyButton();
                   // copied successfully
                 },
                 enableFeedback: true,
@@ -510,7 +510,7 @@ class _RaveState extends State<Rave> {
             (value * _audioHandler.video.duration!.inMilliseconds).toInt()));
   }
 
-  animateCopyButtonOverOneSecond() async {
+  animateCopyButton() async {
     if (mounted) {
       setState(() {
         _copied = true;
