@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'services/audio_handler.dart';
 import 'services/backend_handler.dart';
 import 'package:text_scroll/text_scroll.dart';
+import 'services/service_locator.dart'; // Import the setupLocator function
 
 class Rave extends StatefulWidget {
   Rave({super.key, required this.roomCode});
@@ -16,7 +17,7 @@ class Rave extends StatefulWidget {
 }
 
 class _RaveState extends State<Rave> {
-  late final RaveAudioHandler _audioHandler;
+  final RaveAudioHandler _audioHandler = getIt.get<RaveAudioHandler>();
   bool audioHandlerInitialized = false;
   String localRoomCode = "";
   ConnectionState backendConnectionState = ConnectionState.waiting;
@@ -29,16 +30,10 @@ class _RaveState extends State<Rave> {
   }
 
   Future<void> _initAudioService() async {
-    _audioHandler = await AudioService.init(
-      builder: () => RaveAudioHandler(),
-      config: AudioServiceConfig(
-        androidNotificationChannelId: 'com.alexinabox.openrave.channel.audio',
-        androidNotificationChannelName: 'Music playback',
-      ),
-    );
-
     _audioHandler.addListener(() {
-      setState(() {}); // Rebuild when Metadata updates
+      if (mounted) {
+        setState(() {});
+      } // Rebuild when Metadata updates
     });
 
     await _initWebsocket();
@@ -75,13 +70,19 @@ class _RaveState extends State<Rave> {
         _audioHandler.pauseNoNotify();
       } else if (event == "alive") {
         backendConnectionState = ConnectionState.active;
-        setState(() {});
+        if (mounted) {
+          setState(() {});
+        }
       } else if (event == "error") {
         backendConnectionState = ConnectionState.done;
-        setState(() {});
+        if (mounted) {
+          setState(() {});
+        }
       } else if (event == "closed") {
         backendConnectionState = ConnectionState.done;
-        setState(() {});
+        if (mounted) {
+          setState(() {});
+        }
       }
     });
 

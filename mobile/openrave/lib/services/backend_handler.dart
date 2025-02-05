@@ -7,6 +7,7 @@ class RoomController {
   late String _roomCode;
   final StreamController<String> _eventController =
       StreamController.broadcast();
+  Timer? _keepAliveTimer;
 
   factory RoomController() {
     return _instance;
@@ -21,17 +22,19 @@ class RoomController {
         Uri.parse('wss://openRave.zeitvertreib.vip/backend/?room=$_roomCode');
     _channel = WebSocketChannel.connect(uri);
 
-    // Listen for incoming messages
-    _channel.stream.listen((message) {
-      _eventController.add("alive");
-      _handleMessage(message);
-    }, onError: (error) {
-      print('WebSocket error: $error');
-      _eventController.add("error");
-    }, onDone: () {
-      print('WebSocket connection closed');
-      _eventController.add("closed");
-    });
+    if (!_eventController.isClosed) {
+      // Listen for incoming messages
+      _channel.stream.listen((message) {
+        _eventController.add("alive");
+        _handleMessage(message);
+      }, onError: (error) {
+        print('WebSocket error: $error');
+        _eventController.add("error");
+      }, onDone: () {
+        print('WebSocket connection closed');
+        _eventController.add("closed");
+      });
+    }
 
     // Start keepalive to maintain connection
     _startKeepAlive();
@@ -59,6 +62,7 @@ class RoomController {
   void dispose() {
     _channel.sink.close();
     _eventController.close();
+    _keepAliveTimer?.cancel();
   }
 
   // Send a message to the server
@@ -86,7 +90,7 @@ class RoomController {
 
   // Keepalive function to send periodic "keepalive" messages
   void _startKeepAlive() {
-    Timer.periodic(Duration(seconds: 15), (timer) {
+    _keepAliveTimer = Timer.periodic(Duration(seconds: 15), (timer) {
       _sendMessage('keepalive');
     });
   }

@@ -50,6 +50,7 @@ class RaveAudioHandler extends BaseAudioHandler
     );
     await session.setActive(true);
 
+/*
     session.interruptionEventStream.listen((event) {
       if (event.begin) {
         switch (event.type) {
@@ -79,7 +80,7 @@ class RaveAudioHandler extends BaseAudioHandler
         }
       }
     });
-
+*/
     _audioPlayer.positionStream.listen((event) {
       position = event;
       notifyListeners();

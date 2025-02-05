@@ -1,13 +1,43 @@
 import 'dart:ui';
 
+import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'package:openrave/services/audio_handler.dart';
 import 'intro.dart';
 import 'home.dart';
 import 'package:is_first_run/is_first_run.dart';
 
-void main() {
+import 'services/service_locator.dart'; // Import the setupLocator function
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  final session = await AudioSession.instance;
+  await session.configure(
+    AudioSessionConfiguration(
+      avAudioSessionCategory: AVAudioSessionCategory.playback,
+      avAudioSessionMode: AVAudioSessionMode.defaultMode,
+      androidAudioAttributes: const AndroidAudioAttributes(
+        contentType: AndroidAudioContentType.music,
+        usage: AndroidAudioUsage.media,
+      ),
+      androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
+    ),
+  );
+  await session.setActive(true);
+
+  final RaveAudioHandler audioHandler = await AudioService.init(
+    builder: () => RaveAudioHandler(),
+    config: AudioServiceConfig(
+      androidNotificationChannelId: 'com.alexinabox.openrave.channel.audio',
+      androidNotificationChannelName: 'Music playback',
+    ),
+  );
+
+  setupLocator(audioHandler); // Register the instance globally
+
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
