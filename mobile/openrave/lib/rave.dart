@@ -48,7 +48,6 @@ class _RaveState extends State<Rave> {
   Future<void> _initWebsocket() async {
     final StreamController<String> eventReceiver = StreamController<String>();
     eventReceiver.stream.listen((event) async {
-      print("Got the event: $event");
       if (event.startsWith("catchUp: ")) {
         //"catchUp: uMkBuxEDkyg 104.7096185064935 playing"
         List<String> parts = event.split(' ');
