@@ -4,6 +4,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:openrave/search.dart';
 import 'services/audio_handler.dart';
 import 'services/backend_handler.dart';
 import 'package:text_scroll/text_scroll.dart';
@@ -117,8 +118,11 @@ class _RaveState extends State<Rave> {
             children: [
               const SizedBox(
                   width:
-                      68), //68 is equal to the sum of the width of all elements to the right of the text
-              SelectableText('Room: $localRoomCode'),
+                      80), //68 is equal to the sum of the width of all elements to the right of the text
+              SelectableText(
+                'Room: $localRoomCode',
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(width: 10),
               SizedBox(
                 width: 29,
@@ -126,9 +130,7 @@ class _RaveState extends State<Rave> {
                   onPressed: () async {
                     await Clipboard.setData(ClipboardData(text: localRoomCode));
                     HapticFeedback.heavyImpact();
-
                     await animateCopyButton();
-                    // copied successfully
                   },
                   enableFeedback: true,
                   icon: AnimatedSwitcher(
@@ -153,7 +155,13 @@ class _RaveState extends State<Rave> {
               ),
               IconButton(
                 onPressed: () async {
-                  //Open the search page
+                  Navigator.of(context).push(
+                    PageRouteBuilder(
+                      opaque: false, // Keep the underlying screen visible
+                      pageBuilder: (context, animation, secondaryAnimation) =>
+                          SearchOverlay(),
+                    ),
+                  );
                 },
                 icon: Icon(
                   Icons.search,
