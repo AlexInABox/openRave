@@ -117,9 +117,9 @@ class _RaveState extends State<Rave> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(
-                  width:
-                      80), //68 is equal to the sum of the width of all elements to the right of the text
-              SelectableText(
+                width: 80,
+              ), //68 is equal to the sum of the width of all elements to the right of the text
+              Text(
                 'Room: $localRoomCode',
                 textAlign: TextAlign.center,
               ),
