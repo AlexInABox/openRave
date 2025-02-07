@@ -23,7 +23,7 @@ class _SearchOverlayState extends State<SearchOverlay> {
         automaticBackgroundVisibility: false,
         backgroundColor: Colors.black,
       ),
-      backgroundColor: Colors.black87,
+      backgroundColor: const Color.fromARGB(239, 0, 0, 0),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
@@ -66,55 +66,49 @@ class _SearchOverlayState extends State<SearchOverlay> {
       itemBuilder: (context, index) {
         final result = searchResults[index];
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          padding: const EdgeInsets.symmetric(vertical: 0.1),
           child: GestureDetector(
             onTap: () {
               // Handle tap events (e.g., navigate to a details page)
             },
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[900],
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    spreadRadius: 1,
-                    blurRadius: 5,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Material(
-                // Use Material with transparency so it doesn't override your container's style.
-                type: MaterialType.transparency,
-                child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                  leading: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      "https://yttf.zeitvertreib.vip/?url=https://music.youtube.com/watch?v=${result.id}",
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: 50,
-                          height: 50,
-                          color: Colors.grey[800],
-                          child: const Icon(Icons.error, color: Colors.white),
-                        );
-                      },
+            child: SizedBox(
+              height: MediaQuery.of(context).size.height * 0.08,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                ),
+                child: Material(
+                  // Use Material with transparency so it doesn't override your container's style.
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 0, horizontal: 5),
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        "https://yttf.zeitvertreib.vip/?url=https://music.youtube.com/watch?v=${result.id}",
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 50,
+                            height: 50,
+                            color: Colors.grey[800],
+                            child: const Icon(Icons.error, color: Colors.white),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  title: Text(
-                    result.title,
-                    style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    result.author,
-                    style: TextStyle(color: Colors.grey[300]),
+                    title: Text(
+                      result.title,
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      result.author,
+                      style: TextStyle(color: Colors.grey[300]),
+                    ),
                   ),
                 ),
               ),
