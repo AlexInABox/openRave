@@ -3,6 +3,7 @@ name: "[WebSocket Server] Docker Image CI - main"
 on:
   push:
     branches: [ "main" ]
+    paths: [ 'server/**' ]
 
 jobs:
   docker:
