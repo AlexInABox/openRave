@@ -53,7 +53,6 @@ wss.on('connection', function connection(ws: WebSocket, request) {
       rooms[roomId].users.forEach(client => {
         client.send('paused');
         client.send(message.toString());
-        client.send('playing');
       });
       return;
     }
