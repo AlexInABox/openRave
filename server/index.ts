@@ -1,4 +1,4 @@
-import * as WebSocket from 'ws'
+import * as WebSocket from 'ws';
 
 const wss = new WebSocket.Server({ port: 3000 });
 let rooms: { [key: string]: Room } = {};
