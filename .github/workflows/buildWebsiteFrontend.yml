@@ -3,6 +3,7 @@ name: "[Website] Docker Image CI - main"
 on:
   push:
     branches: [ "main" ]
+    paths: [ 'app/**' ]
 
 jobs:
   docker:
