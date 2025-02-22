@@ -51,7 +51,6 @@ wss.on('connection', function connection(ws: WebSocket, request) {
 
       //now send the videoId to all users in the room including the sender
       rooms[roomId].users.forEach(client => {
-        client.send('paused');
         client.send(message.toString());
       });
       return;
