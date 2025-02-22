@@ -159,7 +159,7 @@ class _RaveState extends State<Rave> {
                     PageRouteBuilder(
                       opaque: false, // Keep the underlying screen visible
                       pageBuilder: (context, animation, secondaryAnimation) =>
-                          SearchOverlay(),
+                          SearchOverlay(roomController: widget._roomController),
                     ),
                   );
                 },

@@ -1,17 +1,21 @@
+import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:http/http.dart' as http;
+import 'services/backend_handler.dart';
 
 class SearchOverlay extends StatefulWidget {
-  const SearchOverlay({super.key});
+  final RoomController roomController;
 
+  const SearchOverlay({super.key, required this.roomController});
   @override
   State<SearchOverlay> createState() => _SearchOverlayState();
 }
 
 class _SearchOverlayState extends State<SearchOverlay> {
   final YoutubeExplode yt = YoutubeExplode();
-  late VideoSearchList searchResults;
+  List<Song> searchResults = [];
   bool searchResultsLoaded = false;
   TextEditingController searchController = TextEditingController();
 
@@ -69,13 +73,14 @@ class _SearchOverlayState extends State<SearchOverlay> {
           padding: const EdgeInsets.symmetric(vertical: 0.1),
           child: GestureDetector(
             onTap: () {
-              // Handle tap events (e.g., navigate to a details page)
+              widget.roomController.changeVideo(result.id);
+              Navigator.of(context).pop();
             },
             child: SizedBox(
               height: MediaQuery.of(context).size.height * 0.08,
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.red,
+                  color: Colors.black,
                 ),
                 child: Material(
                   // Use Material with transparency so it doesn't override your container's style.
@@ -86,7 +91,7 @@ class _SearchOverlayState extends State<SearchOverlay> {
                     leading: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Image.network(
-                        "https://yttf.zeitvertreib.vip/?url=https://music.youtube.com/watch?v=${result.id}",
+                        result.coverUrl,
                         width: 50,
                         height: 50,
                         fit: BoxFit.cover,
@@ -106,7 +111,7 @@ class _SearchOverlayState extends State<SearchOverlay> {
                           color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(
-                      result.author,
+                      result.artist,
                       style: TextStyle(color: Colors.grey[300]),
                     ),
                   ),
@@ -119,14 +124,52 @@ class _SearchOverlayState extends State<SearchOverlay> {
     );
   }
 
-  void populateListOfFoundSongs(String value) async {
+  Future<void> populateListOfFoundSongs(String value) async {
+    searchResults.clear();
+    searchResultsLoaded = false;
     try {
-      searchResults = await yt.search.search(value);
-      searchResultsLoaded = true;
+      final response = await http.get(
+        Uri.parse("https://ytms.zeitvertreib.vip/search?title=$value"),
+      );
+
+      if (response.statusCode == 200) {
+        List<dynamic> jsonList = jsonDecode(response.body); // Parse as List
+        searchResults = jsonList.map((json) => Song.fromJson(json)).toList();
+        searchResultsLoaded = true;
+      } else {
+        searchResultsLoaded = false;
+        throw Exception("Failed to fetch songs: ${response.statusCode}");
+      }
     } catch (e) {
-      // Handle errors (e.g., show a snackbar or error widget)
       searchResultsLoaded = false;
+      debugPrint("Error fetching songs: $e");
     }
+
     if (mounted) setState(() {});
+  }
+}
+
+class Song {
+  final String title;
+  final String artist;
+  final String id;
+  final String coverUrl;
+
+  Song({
+    required this.title,
+    required this.artist,
+    required this.id,
+    required this.coverUrl,
+  });
+
+  // Factory method to create a Song from JSON
+  factory Song.fromJson(Map<String, dynamic> json) {
+    return Song(
+      title: json["title"],
+      artist: json["artist"],
+      id: json["id"],
+      coverUrl:
+          "https://yttf.zeitvertreib.vip/?url=https://music.youtube.com/watch?v=${json["id"]}",
+    );
   }
 }

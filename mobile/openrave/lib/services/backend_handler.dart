@@ -61,6 +61,11 @@ class RoomController {
     _sendMessage('seek: $timestampInSeconds');
   }
 
+  // Send a seek command to the server with the desired timestamp
+  void changeVideo(String videoId) {
+    _sendMessage('videoId: $videoId');
+  }
+
   // Close the WebSocket connection and event controller
   void dispose() {
     _channel.sink.close();
