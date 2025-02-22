@@ -32,18 +32,20 @@ class RaveAudioHandler extends BaseAudioHandler
     if (_isFirstRun) {
       final AudioSession session = getIt.get<AudioSession>();
       session.interruptionEventStream.listen((event) {
+        var simulatedAudioHandler = SimulatedAudioHandler();
+
         if (event.begin) {
           switch (event.type) {
             case AudioInterruptionType.duck:
               // Another app started playing audio and we should duck.
               break;
             case AudioInterruptionType.pause:
-              if (predictedPlayingState) _audioPlayer.play();
+              if (simulatedAudioHandler.isPlaying) _audioPlayer.play();
               // Another app started playing audio and we should pause.
               break;
             case AudioInterruptionType.unknown:
               // Another app started playing audio and we should pause.
-              if (predictedPlayingState) _audioPlayer.play();
+              if (simulatedAudioHandler.isPlaying) _audioPlayer.play();
               break;
           }
         } else {
@@ -77,7 +79,16 @@ class RaveAudioHandler extends BaseAudioHandler
   }
 
   Future<void> catchUp(String videoId, Duration time, String state) async {
-    final startTime = DateTime.now();
+    var simulatedAudioHandler = SimulatedAudioHandler();
+
+    simulatedAudioHandler.reset();
+    simulatedAudioHandler.seek(time);
+    if (state == "playing") {
+      simulatedAudioHandler.play();
+    } else {
+      simulatedAudioHandler.pause();
+    }
+
     _audioPlayer.positionStream.listen((event) {
       position = event;
       notifyListeners();
@@ -88,25 +99,35 @@ class RaveAudioHandler extends BaseAudioHandler
     await refreshMetadata(videoId);
     var link = await getLink(videoId);
     await _audioPlayer.setUrl(link);
-    // Calculate elapsed time
-    final elapsed = DateTime.now().difference(startTime);
-    final adjustedTime = time + elapsed; // Add elapsed time
 
-    if (state == "playing") {
-      await _audioPlayer.seek(adjustedTime); // Seek to the specific time first
-      _audioPlayer.play(); // Start playing after the seek
+    //The wait is over lets sync
+    await seekNoNotify(simulatedAudioHandler.position);
+    if (simulatedAudioHandler.isPlaying) {
+      playNoNotify();
     } else {
-      await _audioPlayer.seek(time); // Seek to the specific time first
-      _audioPlayer.pause();
+      pauseNoNotify();
     }
   }
 
-  Future<void> loadAndPlay(String videoId) async {
+  Future<void> loadNoPlay(String videoId) async {
+    var simulatedAudioHandler = SimulatedAudioHandler();
+
+    simulatedAudioHandler.reset();
+    simulatedAudioHandler.pause();
+
     try {
+      pauseNoNotify();
       await refreshMetadata(videoId);
       var link = await getLink(videoId);
       await _audioPlayer.setUrl(link);
-      playNoNotify();
+
+      //The wait is over lets sync
+      await seekNoNotify(simulatedAudioHandler.position);
+      if (simulatedAudioHandler.isPlaying) {
+        playNoNotify();
+      } else {
+        pauseNoNotify();
+      }
     } catch (e) {
       print("Error loading video: $e");
     }
@@ -129,38 +150,57 @@ class RaveAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> play() async {
+    var simulatedAudioHandler = SimulatedAudioHandler();
+    simulatedAudioHandler.play();
+
     _roomController.play();
     _audioPlayer.play();
-    predictedPlayingState = true;
   }
 
   @override
   Future<void> pause() async {
+    var simulatedAudioHandler = SimulatedAudioHandler();
+    simulatedAudioHandler.pause();
+
     _roomController.pause();
     _audioPlayer.pause();
-    predictedPlayingState = false;
   }
 
   Future<void> playNoNotify() async {
+    var simulatedAudioHandler = SimulatedAudioHandler();
+    simulatedAudioHandler.play();
+
     _audioPlayer.play();
-    predictedPlayingState = true;
   }
 
   Future<void> pauseNoNotify() async {
+    var simulatedAudioHandler = SimulatedAudioHandler();
+    simulatedAudioHandler.pause();
+
     _audioPlayer.pause();
-    predictedPlayingState = false;
   }
 
   @override
   Future<void> seek(Duration position) async {
+    var simulatedAudioHandler = SimulatedAudioHandler();
+    simulatedAudioHandler.seek(position);
+
     _roomController.seek(position.inSeconds.toDouble());
     _audioPlayer.seek(position);
   }
 
-  Future<void> seekNoNotify(Duration position) => _audioPlayer.seek(position);
+  Future<void> seekNoNotify(Duration position) async {
+    var simulatedAudioHandler = SimulatedAudioHandler();
+    simulatedAudioHandler.seek(position);
+
+    _audioPlayer.seek(position);
+  }
 
   @override
   Future<void> stop() async {
+    var simulatedAudioHandler = SimulatedAudioHandler();
+    simulatedAudioHandler.reset();
+
     await _audioPlayer.stop();
     _audioPlayer.dispose();
     _yt.close();
@@ -179,12 +219,15 @@ class RaveAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> skipToNext() async {
+    //TODO: Duration might not exist when the audio is still loading
+    var simulatedAudioHandler = SimulatedAudioHandler();
+    simulatedAudioHandler.seek(_audioPlayer.duration!);
+
     _roomController.seek(_audioPlayer.duration!.inSeconds.toDouble());
     _audioPlayer.seek(_audioPlayer.duration!);
     _audioPlayer.pause();
   }
 
-  bool predictedPlayingState = false;
   bool get isPlaying => _audioPlayer.playing;
 
   void _notifyAudioHandlerAboutPlaybackEvents() {
@@ -223,5 +266,52 @@ class RaveAudioHandler extends BaseAudioHandler
     _audioPlayer.positionStream.listen((position) {
       playbackState.add(playbackState.value.copyWith(updatePosition: position));
     });
+  }
+}
+
+class SimulatedAudioHandler {
+  // Private constructor
+  SimulatedAudioHandler._internal();
+
+  // The single instance of the class
+  static final SimulatedAudioHandler _instance =
+      SimulatedAudioHandler._internal();
+
+  // Factory constructor to return the same instance
+  factory SimulatedAudioHandler() {
+    return _instance;
+  }
+
+  final stopwatch = Stopwatch();
+  Duration lastSeekPosition = Duration.zero;
+
+  // Your methods and properties here
+  void play() {
+    stopwatch.start();
+  }
+
+  void pause() {
+    stopwatch.stop();
+  }
+
+  void seek(Duration position) {
+    lastSeekPosition = position;
+    if (stopwatch.isRunning) {
+      stopwatch.reset();
+      stopwatch.start();
+    }
+    stopwatch.reset();
+  }
+
+  void reset() {
+    stopwatch.stop();
+    stopwatch.reset();
+    lastSeekPosition = Duration.zero;
+  }
+
+  bool get isPlaying => stopwatch.isRunning;
+
+  Duration get position {
+    return stopwatch.elapsed + lastSeekPosition;
   }
 }

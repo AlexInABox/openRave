@@ -64,8 +64,10 @@ class _RaveState extends State<Rave> {
 
         audioHandlerInitialized = true;
       } else if (event.startsWith("videoId: ")) {
+        audioHandlerInitialized = false;
         String videoId = event.substring(9);
-        _audioHandler.loadAndPlay(videoId);
+        await _audioHandler.loadNoPlay(videoId);
+        audioHandlerInitialized = true;
       } else if (event.startsWith("seek: ")) {
         double seekTime = double.parse(event.substring(6));
         _audioHandler
