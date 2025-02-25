@@ -19,7 +19,7 @@ class RaveAudioHandler extends BaseAudioHandler
       enableCaption: false,
       enableJavaScript: false,
       enableKeyboard: false,
-      playsInline: false,
+      playsInline: true,
       showVideoAnnotations: false,
       pointerEvents: yt_iframe.PointerEvents.none,
     ),
