@@ -44,6 +44,7 @@ dependencies:
   web_socket_channel: ^3.0.2
   audio_session: ^0.1.25
   get_it: ^8.0.3
+  youtube_player_iframe: ^5.2.1
 
 dev_dependencies:
   flutter_test:

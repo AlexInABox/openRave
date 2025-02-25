@@ -1,34 +1,39 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:just_audio/just_audio.dart' as just_audio;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:audio_session/audio_session.dart';
 import 'backend_handler.dart';
 import 'service_locator.dart'; // Import the setupLocator function
+import 'package:youtube_player_iframe/youtube_player_iframe.dart'
+    as youtube_player_iframe;
 
 class RaveAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler, ChangeNotifier {
-  late AudioPlayer _audioPlayer;
-  late YoutubeExplode _yt;
+  final YoutubeExplode _yt = YoutubeExplode();
   final RoomController _roomController = RoomController();
-  bool _isFirstRun = true;
+
+  //iFrame integration.. uhhggg..
+  final controller = youtube_player_iframe.YoutubePlayerController(
+    params: const youtube_player_iframe.YoutubePlayerParams(
+      showFullscreenButton: false,
+      showControls: false,
+      enableCaption: false,
+      enableJavaScript: false,
+      enableKeyboard: false,
+      playsInline: true,
+      showVideoAnnotations: false,
+    ),
+  );
 
   late Video video;
-  Duration position = Duration.zero;
+  Duration getPosition() => SimulatedAudioHandler().position;
   MediaItem? currentMediaItem;
 
+  bool _isFirstRun = true;
   Future<void> init() async {
-    _yt = YoutubeExplode();
-    _audioPlayer = AudioPlayer(
-      handleInterruptions: true,
-      audioLoadConfiguration: AudioLoadConfiguration(
-        darwinLoadControl: DarwinLoadControl(
-          preferredForwardBufferDuration: Duration(seconds: 300),
-        ),
-      ),
-    );
-
     if (_isFirstRun) {
       final AudioSession session = getIt.get<AudioSession>();
       session.interruptionEventStream.listen((event) {
@@ -40,12 +45,12 @@ class RaveAudioHandler extends BaseAudioHandler
               // Another app started playing audio and we should duck.
               break;
             case AudioInterruptionType.pause:
-              if (simulatedAudioHandler.isPlaying) _audioPlayer.play();
+              if (simulatedAudioHandler.isPlaying) controller.playVideo();
               // Another app started playing audio and we should pause.
               break;
             case AudioInterruptionType.unknown:
               // Another app started playing audio and we should pause.
-              if (simulatedAudioHandler.isPlaying) _audioPlayer.play();
+              if (simulatedAudioHandler.isPlaying) controller.playVideo();
               break;
           }
         } else {
@@ -66,18 +71,6 @@ class RaveAudioHandler extends BaseAudioHandler
     }
   }
 
-  Future<String> getLink(String id) async {
-    var manifest = await _yt.videos.streamsClient.getManifest(id, ytClients: [
-      YoutubeApiClient.androidVr,
-      YoutubeApiClient.android,
-      YoutubeApiClient.ios,
-      YoutubeApiClient.safari
-    ]);
-    return Platform.isIOS
-        ? manifest.muxed.withHighestBitrate().url.toString()
-        : manifest.audioOnly.withHighestBitrate().url.toString();
-  }
-
   Future<void> catchUp(String videoId, Duration time, String state) async {
     var simulatedAudioHandler = SimulatedAudioHandler();
 
@@ -89,16 +82,15 @@ class RaveAudioHandler extends BaseAudioHandler
       simulatedAudioHandler.pause();
     }
 
-    _audioPlayer.positionStream.listen((event) {
-      position = event;
-      notifyListeners();
-    });
     _notifyAudioHandlerAboutPlaybackEvents();
-    _listenToCurrentPosition();
+    _listenToPositionChanges();
 
     await refreshMetadata(videoId);
-    var link = await getLink(videoId);
-    await _audioPlayer.setUrl(link);
+    await controller.loadVideoById(videoId: videoId);
+
+    //For the video to properly display we need to play and pause it first
+    await controller.playVideo();
+    await controller.pauseVideo();
 
     //The wait is over lets sync
     await seekNoNotify(simulatedAudioHandler.position);
@@ -118,8 +110,9 @@ class RaveAudioHandler extends BaseAudioHandler
     try {
       pauseNoNotify();
       await refreshMetadata(videoId);
-      var link = await getLink(videoId);
-      await _audioPlayer.setUrl(link);
+      await controller.loadVideoById(videoId: videoId);
+      await controller.playVideo();
+      await controller.pauseVideo();
 
       //The wait is over lets sync
       await seekNoNotify(simulatedAudioHandler.position);
@@ -154,7 +147,9 @@ class RaveAudioHandler extends BaseAudioHandler
     simulatedAudioHandler.play();
 
     _roomController.play();
-    _audioPlayer.play();
+    controller.playVideo();
+
+    notifyListeners();
   }
 
   @override
@@ -163,37 +158,48 @@ class RaveAudioHandler extends BaseAudioHandler
     simulatedAudioHandler.pause();
 
     _roomController.pause();
-    _audioPlayer.pause();
+    controller.pauseVideo();
+
+    notifyListeners();
   }
 
   Future<void> playNoNotify() async {
     var simulatedAudioHandler = SimulatedAudioHandler();
     simulatedAudioHandler.play();
 
-    _audioPlayer.play();
+    controller.playVideo();
+
+    notifyListeners();
   }
 
   Future<void> pauseNoNotify() async {
     var simulatedAudioHandler = SimulatedAudioHandler();
     simulatedAudioHandler.pause();
 
-    _audioPlayer.pause();
+    controller.pauseVideo();
+
+    notifyListeners();
   }
 
   @override
   Future<void> seek(Duration position) async {
-    var simulatedAudioHandler = SimulatedAudioHandler();
-    simulatedAudioHandler.seek(position);
+    SimulatedAudioHandler().seek(position);
 
     _roomController.seek(position.inSeconds.toDouble());
-    _audioPlayer.seek(position);
+    controller.seekTo(
+        seconds: position.inSeconds.toDouble(), allowSeekAhead: true);
+
+    notifyListeners();
   }
 
   Future<void> seekNoNotify(Duration position) async {
     var simulatedAudioHandler = SimulatedAudioHandler();
     simulatedAudioHandler.seek(position);
 
-    _audioPlayer.seek(position);
+    controller.seekTo(
+        seconds: position.inSeconds.toDouble(), allowSeekAhead: true);
+
+    notifyListeners();
   }
 
   @override
@@ -201,38 +207,66 @@ class RaveAudioHandler extends BaseAudioHandler
     var simulatedAudioHandler = SimulatedAudioHandler();
     simulatedAudioHandler.reset();
 
-    await _audioPlayer.stop();
-    _audioPlayer.dispose();
+    await controller.stopVideo();
     _yt.close();
     playbackState.add(playbackState.value.copyWith(
       playing: false,
       processingState: AudioProcessingState.idle,
     ));
+
+    notifyListeners();
   }
 
   @override
   Future<void> skipToPrevious() async {
+    SimulatedAudioHandler().seek(Duration.zero);
+
     //always restart the song instead of going back one song. I dont want that now!
     _roomController.seek(0);
-    await _audioPlayer.seek(Duration.zero);
+    await controller.seekTo(seconds: 0, allowSeekAhead: true);
+
+    notifyListeners();
   }
 
   @override
   Future<void> skipToNext() async {
+    final double videoLength = await controller.duration;
     //TODO: Duration might not exist when the audio is still loading
-    var simulatedAudioHandler = SimulatedAudioHandler();
-    simulatedAudioHandler.seek(_audioPlayer.duration!);
+    SimulatedAudioHandler().pause();
+    SimulatedAudioHandler().seek(Duration(seconds: videoLength.toInt()));
 
-    _roomController.seek(_audioPlayer.duration!.inSeconds.toDouble());
-    _audioPlayer.seek(_audioPlayer.duration!);
-    _audioPlayer.pause();
+    _roomController.seek(videoLength);
+    _roomController.pause();
+
+    controller.seekTo(seconds: videoLength, allowSeekAhead: true);
+    controller.pauseVideo();
+
+    notifyListeners();
   }
 
-  bool get isPlaying => _audioPlayer.playing;
+  bool get isPlaying => SimulatedAudioHandler().isPlaying;
 
   void _notifyAudioHandlerAboutPlaybackEvents() {
-    _audioPlayer.playbackEventStream.listen((PlaybackEvent event) {
-      final playing = _audioPlayer.playing;
+    controller.videoStateStream.listen((event) async {
+      final youtube_player_iframe.PlayerState playState =
+          await controller.playerState;
+      final playing = playState == youtube_player_iframe.PlayerState.playing;
+
+      if (playing != SimulatedAudioHandler().isPlaying) {
+        if (playing) {
+          SimulatedAudioHandler().play();
+          _roomController.play();
+        } else {
+          SimulatedAudioHandler().pause();
+          _roomController.pause();
+        }
+      }
+      final bufferedPosition = Duration(
+        milliseconds:
+            (controller.metadata.duration.inMilliseconds * event.loadedFraction)
+                .round(),
+      );
+
       playbackState.add(playbackState.value.copyWith(
         controls: [
           MediaControl.skipToPrevious,
@@ -246,25 +280,37 @@ class RaveAudioHandler extends BaseAudioHandler
           MediaAction.pause,
         },
         androidCompactActionIndices: const [0, 1, 3],
-        processingState: const {
-          ProcessingState.idle: AudioProcessingState.idle,
-          ProcessingState.loading: AudioProcessingState.loading,
-          ProcessingState.buffering: AudioProcessingState.buffering,
-          ProcessingState.ready: AudioProcessingState.ready,
-          ProcessingState.completed: AudioProcessingState.completed,
-        }[_audioPlayer.processingState]!,
         playing: playing,
-        updatePosition: _audioPlayer.position,
-        bufferedPosition: _audioPlayer.bufferedPosition,
-        speed: _audioPlayer.speed,
-        queueIndex: event.currentIndex,
+        updatePosition: event.position,
+        bufferedPosition: bufferedPosition,
+        speed: 1.0,
+        queueIndex: 0,
       ));
+
+      notifyListeners();
     });
   }
 
-  void _listenToCurrentPosition() {
-    _audioPlayer.positionStream.listen((position) {
-      playbackState.add(playbackState.value.copyWith(updatePosition: position));
+  void _listenToPositionChanges() {
+    controller.videoStateStream.listen((event) async {
+      notifyListeners();
+    });
+
+    controller.listen((event) async {
+      final youtube_player_iframe.PlayerState playState =
+          await controller.playerState;
+      final playing = playState == youtube_player_iframe.PlayerState.playing;
+
+      if (playing != SimulatedAudioHandler().isPlaying) {
+        if (playing) {
+          SimulatedAudioHandler().play();
+          _roomController.play();
+        } else {
+          SimulatedAudioHandler().pause();
+          _roomController.pause();
+        }
+      }
+      notifyListeners();
     });
   }
 }

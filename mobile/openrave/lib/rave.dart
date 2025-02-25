@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:openrave/search.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'services/audio_handler.dart';
 import 'services/backend_handler.dart';
 import 'package:text_scroll/text_scroll.dart';
@@ -25,6 +26,7 @@ class _RaveState extends State<Rave> {
   String localRoomCode = "";
   ConnectionState backendConnectionState = ConnectionState.waiting;
   bool _copied = false;
+  bool _audioOnlyMode = false;
 
   @override
   void initState() {
@@ -42,8 +44,6 @@ class _RaveState extends State<Rave> {
     });
 
     await _initWebsocket();
-
-    //await _audioHandler.loadAndPlay("tVGH-g6OQhg"); // Replace with dynamic video ID
   }
 
   Future<void> _initWebsocket() async {
@@ -194,8 +194,71 @@ class _RaveState extends State<Rave> {
                     ),
                   ),
                   SizedBox(
-                    width: MediaQuery.sizeOf(context).width * 0.75,
-                    height: MediaQuery.sizeOf(context).width * 0.75,
+                    height: 25,
+                    child: Container(
+                      padding: EdgeInsets.zero,
+                      decoration: BoxDecoration(
+                        color: Color.fromARGB(255, 33, 33, 33),
+                        borderRadius: BorderRadius.all(Radius.circular(25.0)),
+                      ),
+                      child: ToggleButtons(
+                        borderRadius:
+                            BorderRadius.circular(25), // Rounded edges
+                        renderBorder: false,
+                        isSelected: [_audioOnlyMode, !_audioOnlyMode],
+                        onPressed: (int index) {
+                          setState(() {
+                            _audioOnlyMode = index == 0;
+                          });
+                        },
+                        color: Colors.white,
+                        selectedColor: Colors.white,
+                        fillColor: Color.fromARGB(255, 56, 56, 56),
+                        borderColor: Colors.transparent,
+                        selectedBorderColor: Colors.transparent,
+                        children: [
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(20.0, 0, 20.0, 0),
+                            child: Text("Song",
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                )),
+                          ),
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(20.0, 0, 20.0, 0),
+                            child: Text("Video",
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                )),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 20,
+                  ),
+                  SizedBox(
+                    width: _audioOnlyMode
+                        ? 0
+                        : MediaQuery.sizeOf(context).width * 0.75,
+                    child: YoutubePlayer(
+                      controller: _audioHandler.controller,
+                      keepAlive: true,
+                      aspectRatio: 1 / 1,
+                    ),
+                  ),
+                  SizedBox(
+                    height: _audioOnlyMode
+                        ? MediaQuery.sizeOf(context).width * 0.75
+                        : 0,
+                    width: _audioOnlyMode
+                        ? MediaQuery.sizeOf(context).width * 0.75
+                        : 0,
                     child: Image.network(
                       fit: BoxFit.cover,
                       getCoverImageUrl(),
@@ -415,22 +478,24 @@ class _RaveState extends State<Rave> {
 
   void seekBackForXSeconds(int seconds) {
     if (!audioHandlerInitialized) return;
-    if (_audioHandler.position.inSeconds - seconds < 0) {
+    if (_audioHandler.getPosition().inSeconds - seconds < 0) {
       _audioHandler.seek(Duration(seconds: 0));
       return;
     }
-    _audioHandler.seek(_audioHandler.position - Duration(seconds: seconds));
+    _audioHandler
+        .seek(_audioHandler.getPosition() - Duration(seconds: seconds));
   }
 
   void seekForwardForXSeconds(int seconds) {
     if (!audioHandlerInitialized) return;
-    if (_audioHandler.position.inSeconds + seconds + 1 >
+    if (_audioHandler.getPosition().inSeconds + seconds + 1 >
         _audioHandler.video.duration!.inSeconds) {
       _audioHandler
           .seek(Duration(seconds: _audioHandler.video.duration!.inSeconds));
       return;
     }
-    _audioHandler.seek(_audioHandler.position + Duration(seconds: seconds));
+    _audioHandler
+        .seek(_audioHandler.getPosition() + Duration(seconds: seconds));
   }
 
   IconData getPauseButtonState() {
@@ -450,7 +515,7 @@ class _RaveState extends State<Rave> {
     if (!audioHandlerInitialized) {
       return 0.0;
     }
-    double progress = _audioHandler.position.inMilliseconds /
+    double progress = _audioHandler.getPosition().inMilliseconds /
         _audioHandler.video.duration!.inMilliseconds;
 
     if (progress > 1.0) {
@@ -487,7 +552,7 @@ class _RaveState extends State<Rave> {
 
   String getProgressAsString() {
     if (!audioHandlerInitialized) return "Loading...";
-    return _audioHandler.position.toString();
+    return _audioHandler.getPosition().toString();
   }
 
   String getProgressAsStringShort() {
@@ -497,7 +562,7 @@ class _RaveState extends State<Rave> {
       return getDurationAsStringShort();
     }
 
-    return formattedTime(timeInSecond: _audioHandler.position.inSeconds);
+    return formattedTime(timeInSecond: _audioHandler.getPosition().inSeconds);
   }
 
   formattedTime({required int timeInSecond}) {
