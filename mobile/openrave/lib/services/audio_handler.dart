@@ -1,14 +1,10 @@
-import 'dart:io';
-import 'dart:math';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart' as just_audio;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:audio_session/audio_session.dart';
 import 'backend_handler.dart';
 import 'service_locator.dart'; // Import the setupLocator function
-import 'package:youtube_player_iframe/youtube_player_iframe.dart'
-    as youtube_player_iframe;
+import 'package:youtube_player_iframe/youtube_player_iframe.dart' as yt_iframe;
 
 class RaveAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler, ChangeNotifier {
@@ -16,8 +12,8 @@ class RaveAudioHandler extends BaseAudioHandler
   final RoomController _roomController = RoomController();
 
   //iFrame integration.. uhhggg..
-  final controller = youtube_player_iframe.YoutubePlayerController(
-    params: const youtube_player_iframe.YoutubePlayerParams(
+  final controller = yt_iframe.YoutubePlayerController(
+    params: const yt_iframe.YoutubePlayerParams(
       showFullscreenButton: false,
       showControls: false,
       enableCaption: false,
@@ -28,7 +24,6 @@ class RaveAudioHandler extends BaseAudioHandler
     ),
   );
 
-  late Video video;
   Duration getPosition() => SimulatedAudioHandler().position;
   MediaItem? currentMediaItem;
 
@@ -83,7 +78,6 @@ class RaveAudioHandler extends BaseAudioHandler
     }
 
     _notifyAudioHandlerAboutPlaybackEvents();
-    _listenToPositionChanges();
 
     await refreshMetadata(videoId);
     await controller.loadVideoById(videoId: videoId);
@@ -126,6 +120,7 @@ class RaveAudioHandler extends BaseAudioHandler
     }
   }
 
+  late Video video;
   Future<void> refreshMetadata(String videoId) async {
     video = await _yt.videos.get("https://music.youtube.com/watch?v=$videoId");
     currentMediaItem = MediaItem(
@@ -143,12 +138,19 @@ class RaveAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> play() async {
-    var simulatedAudioHandler = SimulatedAudioHandler();
-    simulatedAudioHandler.play();
+    final yt_iframe.PlayerState _playerState = await controller.playerState;
+
+    if (_playerState == yt_iframe.PlayerState.ended) {
+      seek(Duration.zero);
+    }
+    SimulatedAudioHandler().play();
 
     _roomController.play();
     controller.playVideo();
 
+    playbackState.add(playbackState.value.copyWith(
+      playing: true,
+    ));
     notifyListeners();
   }
 
@@ -160,6 +162,9 @@ class RaveAudioHandler extends BaseAudioHandler
     _roomController.pause();
     controller.pauseVideo();
 
+    playbackState.add(playbackState.value.copyWith(
+      playing: SimulatedAudioHandler().isPlaying,
+    ));
     notifyListeners();
   }
 
@@ -169,6 +174,9 @@ class RaveAudioHandler extends BaseAudioHandler
 
     controller.playVideo();
 
+    playbackState.add(playbackState.value.copyWith(
+      playing: true,
+    ));
     notifyListeners();
   }
 
@@ -177,7 +185,9 @@ class RaveAudioHandler extends BaseAudioHandler
     simulatedAudioHandler.pause();
 
     controller.pauseVideo();
-
+    playbackState.add(playbackState.value.copyWith(
+      playing: SimulatedAudioHandler().isPlaying,
+    ));
     notifyListeners();
   }
 
@@ -189,6 +199,9 @@ class RaveAudioHandler extends BaseAudioHandler
     controller.seekTo(
         seconds: position.inSeconds.toDouble(), allowSeekAhead: true);
 
+    playbackState.add(playbackState.value.copyWith(
+      updatePosition: SimulatedAudioHandler().position,
+    ));
     notifyListeners();
   }
 
@@ -199,6 +212,9 @@ class RaveAudioHandler extends BaseAudioHandler
     controller.seekTo(
         seconds: position.inSeconds.toDouble(), allowSeekAhead: true);
 
+    playbackState.add(playbackState.value.copyWith(
+      updatePosition: SimulatedAudioHandler().position,
+    ));
     notifyListeners();
   }
 
@@ -209,11 +225,11 @@ class RaveAudioHandler extends BaseAudioHandler
 
     await controller.stopVideo();
     _yt.close();
+
     playbackState.add(playbackState.value.copyWith(
-      playing: false,
+      playing: SimulatedAudioHandler().isPlaying,
       processingState: AudioProcessingState.idle,
     ));
-
     notifyListeners();
   }
 
@@ -225,6 +241,10 @@ class RaveAudioHandler extends BaseAudioHandler
     _roomController.seek(0);
     await controller.seekTo(seconds: 0, allowSeekAhead: true);
 
+    playbackState.add(playbackState.value.copyWith(
+      playing: SimulatedAudioHandler().isPlaying,
+      updatePosition: SimulatedAudioHandler().position,
+    ));
     notifyListeners();
   }
 
@@ -241,6 +261,10 @@ class RaveAudioHandler extends BaseAudioHandler
     controller.seekTo(seconds: videoLength, allowSeekAhead: true);
     controller.pauseVideo();
 
+    playbackState.add(playbackState.value.copyWith(
+      playing: SimulatedAudioHandler().isPlaying,
+      updatePosition: SimulatedAudioHandler().position,
+    ));
     notifyListeners();
   }
 
@@ -248,19 +272,8 @@ class RaveAudioHandler extends BaseAudioHandler
 
   void _notifyAudioHandlerAboutPlaybackEvents() {
     controller.videoStateStream.listen((event) async {
-      final youtube_player_iframe.PlayerState playState =
-          await controller.playerState;
-      final playing = playState == youtube_player_iframe.PlayerState.playing;
-
-      if (playing != SimulatedAudioHandler().isPlaying) {
-        if (playing) {
-          SimulatedAudioHandler().play();
-          _roomController.play();
-        } else {
-          SimulatedAudioHandler().pause();
-          _roomController.pause();
-        }
-      }
+      final yt_iframe.PlayerState playState = await controller.playerState;
+      final playing = playState == yt_iframe.PlayerState.playing;
       final bufferedPosition = Duration(
         milliseconds:
             (controller.metadata.duration.inMilliseconds * event.loadedFraction)
@@ -280,36 +293,45 @@ class RaveAudioHandler extends BaseAudioHandler
           MediaAction.pause,
         },
         androidCompactActionIndices: const [0, 1, 3],
+        processingState: AudioProcessingState.ready,
         playing: playing,
         updatePosition: event.position,
         bufferedPosition: bufferedPosition,
         speed: 1.0,
         queueIndex: 0,
       ));
-
-      notifyListeners();
-    });
-  }
-
-  void _listenToPositionChanges() {
-    controller.videoStateStream.listen((event) async {
       notifyListeners();
     });
 
     controller.listen((event) async {
-      final youtube_player_iframe.PlayerState playState =
-          await controller.playerState;
-      final playing = playState == youtube_player_iframe.PlayerState.playing;
+      final yt_iframe.PlayerState playState = await controller.playerState;
+      final playing = playState == yt_iframe.PlayerState.playing;
 
-      if (playing != SimulatedAudioHandler().isPlaying) {
-        if (playing) {
-          SimulatedAudioHandler().play();
-          _roomController.play();
-        } else {
-          SimulatedAudioHandler().pause();
-          _roomController.pause();
-        }
-      }
+      playbackState.add(playbackState.value.copyWith(
+        controls: [
+          MediaControl.skipToPrevious,
+          if (playing) MediaControl.pause else MediaControl.play,
+          MediaControl.skipToNext,
+        ],
+        systemActions: const {
+          MediaAction.skipToPrevious,
+          MediaAction.seek,
+          MediaAction.play,
+          MediaAction.pause,
+        },
+        androidCompactActionIndices: const [0, 1, 3],
+        processingState: const {
+          yt_iframe.PlayerState.buffering: AudioProcessingState.buffering,
+          yt_iframe.PlayerState.cued: AudioProcessingState.ready,
+          yt_iframe.PlayerState.playing: AudioProcessingState.ready,
+          yt_iframe.PlayerState.ended: AudioProcessingState.ready,
+          yt_iframe.PlayerState.paused: AudioProcessingState.ready,
+          yt_iframe.PlayerState.unStarted: AudioProcessingState.loading,
+        }[event.playerState]!,
+        playing: playing,
+        updatePosition: SimulatedAudioHandler().position,
+      ));
+
       notifyListeners();
     });
   }

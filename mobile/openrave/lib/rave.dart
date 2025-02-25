@@ -242,15 +242,28 @@ class _RaveState extends State<Rave> {
                   SizedBox(
                     height: 20,
                   ),
-                  SizedBox(
-                    width: _audioOnlyMode
-                        ? 0
-                        : MediaQuery.sizeOf(context).width * 0.75,
-                    child: YoutubePlayer(
-                      controller: _audioHandler.controller,
-                      keepAlive: true,
-                      aspectRatio: 1 / 1,
-                    ),
+                  Stack(
+                    children: [
+                      SizedBox(
+                        width: _audioOnlyMode
+                            ? 0
+                            : MediaQuery.sizeOf(context).width * 0.75,
+                        child: YoutubePlayer(
+                          controller: _audioHandler.controller,
+                          keepAlive: true,
+                          aspectRatio: 1 / 1,
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: AbsorbPointer(
+                          absorbing: true, // Blocks interaction
+                          child: Container(
+                            color: Colors
+                                .transparent, // Ensures the overlay is invisible
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   SizedBox(
                     height: _audioOnlyMode
