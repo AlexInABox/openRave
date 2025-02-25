@@ -19,8 +19,9 @@ class RaveAudioHandler extends BaseAudioHandler
       enableCaption: false,
       enableJavaScript: false,
       enableKeyboard: false,
-      playsInline: true,
+      playsInline: false,
       showVideoAnnotations: false,
+      pointerEvents: yt_iframe.PointerEvents.none,
     ),
   );
 
@@ -67,14 +68,12 @@ class RaveAudioHandler extends BaseAudioHandler
   }
 
   Future<void> catchUp(String videoId, Duration time, String state) async {
-    var simulatedAudioHandler = SimulatedAudioHandler();
-
-    simulatedAudioHandler.reset();
-    simulatedAudioHandler.seek(time);
+    SimulatedAudioHandler().reset();
+    SimulatedAudioHandler().seek(time);
     if (state == "playing") {
-      simulatedAudioHandler.play();
+      SimulatedAudioHandler().play();
     } else {
-      simulatedAudioHandler.pause();
+      SimulatedAudioHandler().pause();
     }
 
     _notifyAudioHandlerAboutPlaybackEvents();
@@ -82,42 +81,18 @@ class RaveAudioHandler extends BaseAudioHandler
     await refreshMetadata(videoId);
     await controller.loadVideoById(videoId: videoId);
 
-    //For the video to properly display we need to play and pause it first
-    await controller.playVideo();
-    await controller.pauseVideo();
-
-    //The wait is over lets sync
-    await seekNoNotify(simulatedAudioHandler.position);
-    if (simulatedAudioHandler.isPlaying) {
-      playNoNotify();
-    } else {
-      pauseNoNotify();
-    }
+    await syncControllerWithPrediction();
   }
 
   Future<void> loadNoPlay(String videoId) async {
-    var simulatedAudioHandler = SimulatedAudioHandler();
+    SimulatedAudioHandler().reset();
+    SimulatedAudioHandler().pause();
+    await controller.pauseVideo();
 
-    simulatedAudioHandler.reset();
-    simulatedAudioHandler.pause();
+    await refreshMetadata(videoId);
+    await controller.loadVideoById(videoId: videoId);
 
-    try {
-      pauseNoNotify();
-      await refreshMetadata(videoId);
-      await controller.loadVideoById(videoId: videoId);
-      await controller.playVideo();
-      await controller.pauseVideo();
-
-      //The wait is over lets sync
-      await seekNoNotify(simulatedAudioHandler.position);
-      if (simulatedAudioHandler.isPlaying) {
-        playNoNotify();
-      } else {
-        pauseNoNotify();
-      }
-    } catch (e) {
-      print("Error loading video: $e");
-    }
+    await syncControllerWithPrediction();
   }
 
   late Video video;
@@ -334,6 +309,18 @@ class RaveAudioHandler extends BaseAudioHandler
 
       notifyListeners();
     });
+  }
+
+  Future<void> syncControllerWithPrediction() async {
+    if (SimulatedAudioHandler().isPlaying) {
+      await controller.playVideo();
+    } else {
+      await controller.pauseVideo();
+    }
+
+    await controller.seekTo(
+        seconds: SimulatedAudioHandler().position.inSeconds.toDouble(),
+        allowSeekAhead: true);
   }
 }
 
